@@ -425,6 +425,13 @@
 
   .status-dot.connected { background: #8bc34a; }
   .status-dot.disconnected { background: #e57373; }
+
+  @media (max-width: 600px) {
+    .card-actions button {
+      padding: 10px 12px;
+      font-size: 0.85rem;
+    }
+  }
 </style>
 </head>
 <body>
@@ -626,7 +633,7 @@ document.getElementById("pin-input").addEventListener("keydown", (e) => {
 });
 
 /* ── Drag State ── */
-let dragState = null; // { colId, idx, ghost, currentDropCol, currentDropIdx }
+let dragState = null; // { colId, idx, ghost, currentDropCol, currentDropIdx, scrollInterval }
 
 const USERS = ["Nina", "Stephan"];
 
@@ -936,6 +943,26 @@ function showDropIndicator(col, idx) {
   }
 }
 
+/* ── Auto-scroll during drag ── */
+const SCROLL_EDGE = 50; // px from screen edge to trigger scroll
+const SCROLL_SPEED = 8; // px per frame
+
+function updateAutoScroll(x) {
+  const board = document.getElementById("board");
+  const screenW = window.innerWidth;
+
+  if (dragState.scrollInterval) {
+    clearInterval(dragState.scrollInterval);
+    dragState.scrollInterval = null;
+  }
+
+  if (x < SCROLL_EDGE) {
+    dragState.scrollInterval = setInterval(() => { board.scrollLeft -= SCROLL_SPEED; }, 16);
+  } else if (x > screenW - SCROLL_EDGE) {
+    dragState.scrollInterval = setInterval(() => { board.scrollLeft += SCROLL_SPEED; }, 16);
+  }
+}
+
 function finishDrag() {
   if (!dragState) return;
 
@@ -944,6 +971,7 @@ function finishDrag() {
   let dropIdx = dragState.currentDropIdx;
 
   // Clean up
+  if (dragState.scrollInterval) clearInterval(dragState.scrollInterval);
   if (ghost) ghost.remove();
   clearDropIndicators();
   document.querySelectorAll(".card.dragging").forEach(el => el.classList.remove("dragging"));
@@ -998,6 +1026,7 @@ function onTouchMove(e) {
   e.preventDefault();
   const touch = e.touches[0];
   moveGhost(dragState.ghost, touch.clientX, touch.clientY);
+  updateAutoScroll(touch.clientX);
 
   const { col, idx } = getDropTarget(touch.clientX, touch.clientY);
   dragState.currentDropCol = col;
@@ -1038,6 +1067,7 @@ function onMouseDown(e) {
 function onMouseMove(e) {
   if (!dragState) return;
   moveGhost(dragState.ghost, e.clientX, e.clientY);
+  updateAutoScroll(e.clientX);
 
   const { col, idx } = getDropTarget(e.clientX, e.clientY);
   dragState.currentDropCol = col;
