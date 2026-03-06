@@ -1,4 +1,4 @@
-const CACHE_NAME = "kanban-v1";
+const CACHE_NAME = "kanban-v2";
 const ASSETS = ["./index.html", "./icon.svg", "./manifest.json"];
 
 self.addEventListener("install", (e) => {
@@ -16,6 +16,23 @@ self.addEventListener("activate", (e) => {
 });
 
 self.addEventListener("fetch", (e) => {
+  const url = new URL(e.request.url);
+
+  // Network-first for HTML files (so Firebase config updates are picked up)
+  if (e.request.mode === "navigate" || url.pathname.endsWith(".html") || url.pathname.endsWith("/")) {
+    e.respondWith(
+      fetch(e.request)
+        .then((response) => {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(e.request, clone));
+          return response;
+        })
+        .catch(() => caches.match(e.request))
+    );
+    return;
+  }
+
+  // Cache-first for other assets
   e.respondWith(
     caches.match(e.request).then((cached) => cached || fetch(e.request))
   );
