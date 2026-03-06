@@ -1081,9 +1081,10 @@ function onMouseUp() {
   finishDrag();
 }
 
-/* ── Enter to submit ── */
+/* ── Enter to submit (desktop only) ── */
+const isTouchDevice = "ontouchstart" in window || navigator.maxTouchPoints > 0;
 document.addEventListener("keydown", (e) => {
-  if (e.target.tagName === "TEXTAREA" && e.key === "Enter" && !e.shiftKey) {
+  if (e.target.tagName === "TEXTAREA" && e.key === "Enter" && !e.shiftKey && !isTouchDevice) {
     e.preventDefault();
     const colId = e.target.id.replace("input-", "");
     addTask(colId);
