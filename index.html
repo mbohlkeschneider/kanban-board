@@ -11,6 +11,7 @@
 <title>Kanban Board</title>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -187,6 +188,16 @@
     line-height: 1.4;
     color: #4a4a4a;
   }
+
+  .card-text p { margin: 0 0 4px 0; }
+  .card-text p:last-child { margin-bottom: 0; }
+  .card-text ul, .card-text ol { margin: 2px 0; padding-left: 20px; }
+  .card-text li { margin: 1px 0; }
+  .card-text code { background: #f0e8f0; padding: 1px 4px; border-radius: 3px; font-size: 0.8rem; }
+  .card-text pre { background: #f0e8f0; padding: 6px; border-radius: 6px; overflow-x: auto; margin: 4px 0; }
+  .card-text pre code { background: none; padding: 0; }
+  .card-text strong { color: #5a4a5a; }
+  .card-text h1, .card-text h2, .card-text h3 { font-size: 0.9rem; margin: 4px 0 2px 0; color: #5a4a5a; }
 
   .assignee-tag {
     display: inline-block;
@@ -698,8 +709,9 @@ function render() {
       const assigneeLabel = item.assignee || "—";
       const assigneeClass = item.assignee ? `" data-user="${item.assignee}` : ' unassigned';
 
+      const renderedText = window.marked ? marked.parse(item.text) : escapeHtml(item.text);
       card.innerHTML = `
-        <div class="card-text">${escapeHtml(item.text)}</div>
+        <div class="card-text">${renderedText}</div>
         <button class="assignee-tag${assigneeClass}" onclick="cycleAssignee('${col.id}',${idx})">${escapeHtml(assigneeLabel)}</button>
         <div class="card-actions">${btns}</div>
       `;
@@ -1090,6 +1102,11 @@ document.addEventListener("keydown", (e) => {
     addTask(colId);
   }
 });
+
+// Configure marked for card-friendly output
+if (window.marked) {
+  marked.setOptions({ breaks: true });
+}
 
 // Initialize Firebase SDK if available, then start app
 try {
