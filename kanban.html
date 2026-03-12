@@ -172,10 +172,16 @@
     border: 2px solid #f0e8f0;
     cursor: grab;
     transition: box-shadow 0.15s, opacity 0.15s, transform 0.15s;
-    touch-action: none;
   }
 
   .card:active { cursor: grabbing; }
+
+  .card.long-press {
+    transform: scale(1.03);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+    z-index: 10;
+    position: relative;
+  }
 
   .card.dragging {
     opacity: 0.4;
@@ -1006,7 +1012,20 @@ function finishDrag() {
   render();
 }
 
-/* ── Touch Drag ── */
+/* ── Touch Drag (long-press to initiate) ── */
+const LONG_PRESS_MS = 300;
+const LONG_PRESS_MOVE_THRESHOLD = 10; // px – cancel if finger moves before timer
+let longPressTimer = null;
+let longPressCard = null;
+let longPressStartX = 0;
+let longPressStartY = 0;
+let touchDragActive = false;
+
+function cancelLongPress() {
+  if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+  if (longPressCard) { longPressCard.classList.remove("long-press"); longPressCard = null; }
+}
+
 function onTouchStart(e) {
   // Don't drag if tapping a button or editing
   if (e.target.closest("button")) return;
@@ -1017,26 +1036,56 @@ function onTouchStart(e) {
   if (!card) return;
 
   const touch = e.touches[0];
-  const colId = card.dataset.col;
-  const idx = parseInt(card.dataset.idx);
-  const tasks = loadTasks();
-  const item = normalizeTask(tasks[colId][idx]);
+  longPressStartX = touch.clientX;
+  longPressStartY = touch.clientY;
+  longPressCard = card;
+  touchDragActive = false;
 
-  e.preventDefault();
+  // Start long-press timer
+  longPressTimer = setTimeout(() => {
+    longPressTimer = null;
+    // Activate drag
+    const colId = card.dataset.col;
+    const idx = parseInt(card.dataset.idx);
+    const tasks = loadTasks();
+    const item = normalizeTask(tasks[colId][idx]);
 
-  card.classList.add("dragging");
-  const ghost = createGhost(item.text, touch.clientX, touch.clientY);
+    card.classList.remove("long-press");
+    card.classList.add("dragging");
+    const ghost = createGhost(item.text, touch.clientX, touch.clientY);
 
-  dragState = { colId, idx, ghost, currentDropCol: null, currentDropIdx: 0 };
+    dragState = { colId, idx, ghost, currentDropCol: null, currentDropIdx: 0 };
+    touchDragActive = true;
+
+    // Vibrate for haptic feedback if available
+    if (navigator.vibrate) navigator.vibrate(30);
+  }, LONG_PRESS_MS);
+
+  // Show visual feedback after a short delay
+  setTimeout(() => { if (longPressTimer && longPressCard === card) card.classList.add("long-press"); }, 100);
 
   document.addEventListener("touchmove", onTouchMove, { passive: false });
   document.addEventListener("touchend", onTouchEnd);
 }
 
 function onTouchMove(e) {
-  if (!dragState) return;
-  e.preventDefault();
   const touch = e.touches[0];
+
+  // If long-press hasn't fired yet, check if finger moved too far (= scrolling)
+  if (longPressTimer) {
+    const dx = touch.clientX - longPressStartX;
+    const dy = touch.clientY - longPressStartY;
+    if (Math.abs(dx) > LONG_PRESS_MOVE_THRESHOLD || Math.abs(dy) > LONG_PRESS_MOVE_THRESHOLD) {
+      cancelLongPress();
+      // Let the browser handle native scrolling
+      return;
+    }
+    e.preventDefault(); // Hold still = don't scroll yet
+    return;
+  }
+
+  if (!touchDragActive || !dragState) return;
+  e.preventDefault();
   moveGhost(dragState.ghost, touch.clientX, touch.clientY);
   updateAutoScroll(touch.clientX);
 
@@ -1047,9 +1096,13 @@ function onTouchMove(e) {
 }
 
 function onTouchEnd() {
+  cancelLongPress();
   document.removeEventListener("touchmove", onTouchMove);
   document.removeEventListener("touchend", onTouchEnd);
-  finishDrag();
+  if (touchDragActive) {
+    touchDragActive = false;
+    finishDrag();
+  }
 }
 
 /* ── Mouse Drag ── */
