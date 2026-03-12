@@ -36,6 +36,32 @@
     letter-spacing: 0.5px;
   }
 
+  .board-title {
+    cursor: pointer;
+    padding: 2px 8px;
+    border-radius: 8px;
+    transition: background 0.15s;
+  }
+
+  .board-title:hover { background: #f5f0f5; }
+
+  .board-title-input {
+    background: #faf3f0;
+    border: 2px solid #DCCCEC;
+    border-radius: 8px;
+    padding: 4px 10px;
+    font-family: inherit;
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: #5a4a5a;
+    text-align: center;
+    letter-spacing: 0.5px;
+    width: 70%;
+    max-width: 400px;
+  }
+
+  .board-title-input:focus { outline: none; border-color: #FFCBE1; }
+
   .board {
     display: flex;
     gap: 12px;
@@ -462,7 +488,7 @@
   </div>
 </div>
 
-<header>Kanban Board<span class="status-dot" id="status-dot" title="Offline"></span></header>
+<header><span class="board-title" id="board-title" onclick="startBoardRename()">Kanban Board</span><span class="status-dot" id="status-dot" title="Offline"></span></header>
 
 <div class="board" id="board"></div>
 
@@ -483,6 +509,7 @@ const firebaseConfig = {
 let db = null;
 let columnsRef = null;
 let tasksRef = null;
+let boardNameRef = null;
 let renderTimeout = null;
 
 const PALETTE = ["#FFCBE1", "#F9E1A8", "#D6E5BD", "#BCD8EC", "#DCCCEC", "#FFDAB4"];
@@ -550,6 +577,53 @@ function saveTasks(tasks) {
   if (tasksRef) tasksRef.set(tasks);
 }
 
+function loadBoardName() {
+  return localStorage.getItem("kanban_board_name") || "Kanban Board";
+}
+
+function saveBoardName(name) {
+  localStorage.setItem("kanban_board_name", name);
+  if (boardNameRef) boardNameRef.set(name);
+}
+
+function updateBoardTitleDisplay() {
+  const el = document.getElementById("board-title");
+  if (el && el.tagName !== "INPUT") {
+    el.textContent = loadBoardName();
+  }
+}
+
+function startBoardRename() {
+  const titleEl = document.getElementById("board-title");
+  if (!titleEl) return;
+
+  const input = document.createElement("input");
+  input.className = "board-title-input";
+  input.value = loadBoardName();
+  input.maxLength = 40;
+
+  titleEl.replaceWith(input);
+  input.focus();
+  input.select();
+
+  function finishRename() {
+    const newName = input.value.trim() || "Kanban Board";
+    saveBoardName(newName);
+    const span = document.createElement("span");
+    span.className = "board-title";
+    span.id = "board-title";
+    span.textContent = newName;
+    span.onclick = startBoardRename;
+    input.replaceWith(span);
+  }
+
+  input.addEventListener("blur", finishRename);
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); input.blur(); }
+    if (e.key === "Escape") { input.removeEventListener("blur", finishRename); updateBoardTitleDisplay(); }
+  });
+}
+
 /* ── SHA-256 hashing for PIN → boardId ── */
 async function hashPin(pin) {
   const data = new TextEncoder().encode(pin);
@@ -565,6 +639,7 @@ function connectFirebase(boardId) {
     db = firebase.database();
     columnsRef = db.ref("boards/" + boardId + "/columns");
     tasksRef = db.ref("boards/" + boardId + "/tasks");
+    boardNameRef = db.ref("boards/" + boardId + "/name");
 
     // Connection status indicator
     const dot = document.getElementById("status-dot");
@@ -575,6 +650,18 @@ function connectFirebase(boardId) {
       } else {
         dot.className = "status-dot disconnected";
         dot.title = "Offline";
+      }
+    });
+
+    // Real-time sync for board name
+    boardNameRef.on("value", (snap) => {
+      const name = snap.val();
+      if (name) {
+        localStorage.setItem("kanban_board_name", name);
+        updateBoardTitleDisplay();
+      } else {
+        // First connection — push local name
+        boardNameRef.set(loadBoardName());
       }
     });
 
@@ -622,6 +709,7 @@ async function initApp() {
   if (storedBoardId) {
     // Have a boardId — render immediately from localStorage, then connect
     document.getElementById("pin-overlay").classList.add("hidden");
+    updateBoardTitleDisplay();
     render();
     connectFirebase(storedBoardId);
   } else {
