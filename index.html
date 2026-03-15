@@ -291,6 +291,7 @@
   .btn-right { background: #DCCCEC; }
   .btn-edit { background: #FFCBE1; flex: 0 0 auto; }
   .btn-delete { background: #FFDAB4; flex: 0 0 auto; }
+  .btn-label { background: #f0e8f0; flex: 0 0 auto; }
 
   .card.editing { cursor: default; border-color: #DCCCEC; }
 
@@ -663,6 +664,60 @@
 
   .btn-remove-member:active { opacity: 0.6; }
 
+  .settings-section {
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 2px solid #f0e8f0;
+  }
+
+  .settings-section:last-of-type {
+    border-bottom: none;
+    margin-bottom: 10px;
+    padding-bottom: 0;
+  }
+
+  .settings-section h3 {
+    color: #5a4a5a;
+    font-size: 0.95rem;
+    margin-bottom: 12px;
+  }
+
+  .label-tag {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    font-size: 0.65rem;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 8px;
+    color: #5a4a5a;
+    white-space: nowrap;
+    max-width: 50%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .color-swatches {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+  }
+
+  .color-swatch {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 3px solid transparent;
+    cursor: pointer;
+    transition: border-color 0.15s, transform 0.15s;
+    padding: 0;
+  }
+
+  .color-swatch:hover { transform: scale(1.1); }
+  .color-swatch.selected { border-color: #5a4a5a; }
+
   .add-member-row {
     display: flex;
     flex-direction: column;
@@ -739,7 +794,7 @@
   <button class="btn-back hidden" id="btn-back" onclick="showBoardSelector()">&#9776;</button>
   <span class="board-title" id="board-title" onclick="startBoardRename()">Kanban Board</span>
   <span class="status-dot" id="status-dot" title="Offline"></span>
-  <button class="btn-users hidden" id="btn-users" onclick="showOverlay('manage-users')" title="Manage members">&#9881;</button>
+  <button class="btn-users hidden" id="btn-users" onclick="showOverlay('board-settings')" title="Manage members">&#9881;</button>
 </header>
 
 <div class="board" id="board"></div>
@@ -763,6 +818,7 @@ let tasksRef = null;
 let boardNameRef = null;
 let userBoardsRef = null;
 let usersRef = null;
+let labelsRef = null;
 let renderTimeout = null;
 
 /* ── Multi-board State ── */
@@ -970,10 +1026,11 @@ function showOverlay(state) {
       document.getElementById("migrate-pin-input").focus();
       break;
 
-    case "manage-users": {
+    case "board-settings": {
+      // Members section
       let membersHtml = "";
       if (boardUsers.length === 0) {
-        membersHtml = `<div class="members-empty">No members yet. Add people to assign cards to them.</div>`;
+        membersHtml = `<div class="members-empty">No members yet.</div>`;
       } else {
         boardUsers.forEach((name, i) => {
           membersHtml += `<div class="member-item">
@@ -983,21 +1040,51 @@ function showOverlay(state) {
           </div>`;
         });
       }
+
+      // Labels section
+      let labelsHtml = "";
+      if (boardLabels.length === 0) {
+        labelsHtml = `<div class="members-empty">No labels yet.</div>`;
+      } else {
+        boardLabels.forEach((label, i) => {
+          labelsHtml += `<div class="member-item">
+            <span class="member-dot" style="background:${label.color}"></span>
+            <span class="member-name">${escapeHtml(label.name)}</span>
+            <button class="btn-remove-member" onclick="removeBoardLabel(${i})" title="Remove">&#x2715;</button>
+          </div>`;
+        });
+      }
+
+      const swatchesHtml = PALETTE.map(c =>
+        `<button class="color-swatch${c === selectedLabelColor ? ' selected' : ''}" style="background:${c}" onclick="selectLabelColor('${c}')"></button>`
+      ).join('');
+
       overlay.innerHTML = `<div class="pin-box" style="max-width:360px">
-        <h2>Board Members</h2>
-        <div class="member-list">${membersHtml}</div>
-        <div class="add-member-row">
-          <input type="text" id="new-member-input" placeholder="Name" autocomplete="off">
-          <button onclick="addBoardUser()">Add</button>
+        <h2>Board Settings</h2>
+
+        <div class="settings-section">
+          <h3>Members</h3>
+          <div class="member-list">${membersHtml}</div>
+          <div class="add-member-row">
+            <input type="text" id="new-member-input" placeholder="Name" autocomplete="off">
+            <button onclick="addBoardUser()">Add</button>
+          </div>
         </div>
+
+        <div class="settings-section">
+          <h3>Labels</h3>
+          <div class="member-list">${labelsHtml}</div>
+          <div class="color-swatches">${swatchesHtml}</div>
+          <div class="add-member-row">
+            <input type="text" id="new-label-input" placeholder="Label name" autocomplete="off">
+            <button onclick="addBoardLabel()">Add</button>
+          </div>
+        </div>
+
         <button class="btn-secondary" onclick="showOverlay(null)">Done</button>
       </div>`;
       setupEnterKey("new-member-input", addBoardUser);
-      const memberInput = document.getElementById("new-member-input");
-      memberInput.focus();
-      memberInput.addEventListener("focus", () => {
-        setTimeout(() => memberInput.scrollIntoView({ behavior: "smooth", block: "center" }), 300);
-      });
+      setupEnterKey("new-label-input", addBoardLabel);
       break;
     }
   }
@@ -1113,14 +1200,36 @@ function addBoardUser() {
   if (!name) return;
   if (boardUsers.includes(name)) { input.value = ""; return; }
   saveBoardUsers([...boardUsers, name]);
-  showOverlay("manage-users");
+  showOverlay("board-settings");
 }
 
 function removeBoardUser(idx) {
   const users = [...boardUsers];
   users.splice(idx, 1);
   saveBoardUsers(users);
-  showOverlay("manage-users");
+  showOverlay("board-settings");
+}
+
+/* ── Board Label Management ── */
+function addBoardLabel() {
+  const input = document.getElementById("new-label-input");
+  const name = input.value.trim();
+  if (!name) return;
+  if (boardLabels.some(l => l.name === name)) { input.value = ""; return; }
+  saveBoardLabels([...boardLabels, { name, color: selectedLabelColor }]);
+  showOverlay("board-settings");
+}
+
+function removeBoardLabel(idx) {
+  const labels = [...boardLabels];
+  labels.splice(idx, 1);
+  saveBoardLabels(labels);
+  showOverlay("board-settings");
+}
+
+function selectLabelColor(color) {
+  selectedLabelColor = color;
+  showOverlay("board-settings");
 }
 
 /* ── Firebase Connection ── */
@@ -1164,6 +1273,7 @@ function disconnectBoard() {
   if (tasksRef) { tasksRef.off(); tasksRef = null; }
   if (boardNameRef) { boardNameRef.off(); boardNameRef = null; }
   if (usersRef) { usersRef.off(); usersRef = null; }
+  if (labelsRef) { labelsRef.off(); labelsRef = null; }
 }
 
 function connectFirebase(boardId) {
@@ -1226,6 +1336,17 @@ function connectFirebase(boardId) {
       debouncedRender();
     }
   });
+
+  // Real-time sync for board labels
+  labelsRef = db.ref("boards/" + boardId + "/labels");
+  labelsRef.on("value", (snap) => {
+    const data = snap.val();
+    if (data) {
+      boardLabels = Array.isArray(data) ? data : Object.values(data);
+      localStorage.setItem("kanban_board_labels", JSON.stringify(boardLabels));
+      debouncedRender();
+    }
+  });
 }
 
 /* ── Board Switching ── */
@@ -1237,7 +1358,9 @@ function switchToBoard(boardId) {
     localStorage.removeItem("kanban_columns");
     localStorage.removeItem("kanban_tasks");
     localStorage.removeItem("kanban_board_users");
+    localStorage.removeItem("kanban_board_labels");
     boardUsers = [];
+    boardLabels = [];
   }
   localStorage.setItem("kanban_board_id", boardId);
   localStorage.setItem("kanban_last_board_id", boardId);
@@ -1246,6 +1369,7 @@ function switchToBoard(boardId) {
     localStorage.setItem("kanban_board_name", userBoards[boardId].name);
   }
   boardUsers = loadBoardUsers();
+  boardLabels = loadBoardLabels();
   showOverlay(null);
   document.getElementById("btn-back").classList.remove("hidden");
   document.getElementById("btn-users").classList.remove("hidden");
@@ -1302,6 +1426,8 @@ async function initApp() {
 let dragState = null;
 
 let boardUsers = [];
+let boardLabels = [];
+let selectedLabelColor = "#FFCBE1";
 
 function loadBoardUsers() {
   try {
@@ -1319,6 +1445,18 @@ function getUserColor(userName) {
   const idx = boardUsers.indexOf(userName);
   if (idx === -1) return "#f0e8f0";
   return PALETTE[idx % PALETTE.length];
+}
+
+function loadBoardLabels() {
+  try {
+    return JSON.parse(localStorage.getItem("kanban_board_labels")) || [];
+  } catch { return []; }
+}
+
+function saveBoardLabels(labels) {
+  boardLabels = labels;
+  localStorage.setItem("kanban_board_labels", JSON.stringify(labels));
+  if (labelsRef) labelsRef.set(labels);
 }
 
 function escapeHtml(str) {
@@ -1375,6 +1513,10 @@ function render() {
       let btns = "";
       if (canLeft) btns += `<button class="btn-left" onclick="moveTask('${col.id}',${idx},-1)">&larr;</button>`;
       if (canRight) btns += `<button class="btn-right" onclick="moveTask('${col.id}',${idx},1)">&rarr;</button>`;
+      const currentLabel = item.label || "";
+      const labelDef = currentLabel ? boardLabels.find(l => l.name === currentLabel) : null;
+      const labelBtnStyle = labelDef ? `background:${labelDef.color}` : '';
+      btns += `<button class="btn-label" style="${labelBtnStyle}" onclick="cycleLabel('${col.id}',${idx})">#</button>`;
       btns += `<button class="btn-edit" onclick="editTask('${col.id}',${idx})">&#9998;</button>`;
       btns += `<button class="btn-delete" onclick="deleteTask('${col.id}',${idx})">&#x2715;</button>`;
 
@@ -1382,8 +1524,10 @@ function render() {
       const assigneeClass = item.assignee ? '' : ' unassigned';
       const tagStyle = item.assignee ? `background:${getUserColor(item.assignee)};color:#5a4a5a` : '';
 
+      const labelHtml = labelDef ? `<span class="label-tag" style="background:${labelDef.color}">${escapeHtml(labelDef.name)}</span>` : '';
       const renderedText = window.marked ? marked.parse(item.text) : escapeHtml(item.text);
       card.innerHTML = `
+        ${labelHtml}
         <div class="card-text">${renderedText}</div>
         <button class="assignee-tag${assigneeClass}" style="${tagStyle}" onclick="cycleAssignee('${col.id}',${idx})">${escapeHtml(assigneeLabel)}</button>
         <div class="card-actions">${btns}</div>
@@ -1468,6 +1612,19 @@ function cycleAssignee(colId, idx) {
   const cycle = ["", ...boardUsers];
   const next = (cycle.indexOf(item.assignee) + 1) % cycle.length;
   item.assignee = cycle[next];
+  tasks[colId][idx] = item;
+  saveTasks(tasks);
+  render();
+}
+
+function cycleLabel(colId, idx) {
+  const tasks = loadTasks();
+  const item = normalizeTask(tasks[colId][idx]);
+  const currentLabel = item.label || "";
+  const labelNames = boardLabels.map(l => l.name);
+  const cycle = ["", ...labelNames];
+  const next = (cycle.indexOf(currentLabel) + 1) % cycle.length;
+  item.label = cycle[next];
   tasks[colId][idx] = item;
   saveTasks(tasks);
   render();
