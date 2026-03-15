@@ -682,17 +682,20 @@
     margin-bottom: 12px;
   }
 
+  .label-row {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 4px;
+  }
+
   .label-tag {
-    position: absolute;
-    top: 8px;
-    right: 8px;
     font-size: 0.65rem;
     font-weight: 700;
     padding: 2px 8px;
     border-radius: 8px;
     color: #5a4a5a;
     white-space: nowrap;
-    max-width: 50%;
+    max-width: 60%;
     overflow: hidden;
     text-overflow: ellipsis;
   }
@@ -1524,7 +1527,7 @@ function render() {
       const assigneeClass = item.assignee ? '' : ' unassigned';
       const tagStyle = item.assignee ? `background:${getUserColor(item.assignee)};color:#5a4a5a` : '';
 
-      const labelHtml = labelDef ? `<span class="label-tag" style="background:${labelDef.color}">${escapeHtml(labelDef.name)}</span>` : '';
+      const labelHtml = labelDef ? `<div class="label-row"><span class="label-tag" style="background:${labelDef.color}">${escapeHtml(labelDef.name)}</span></div>` : '';
       const renderedText = window.marked ? marked.parse(item.text) : escapeHtml(item.text);
       card.innerHTML = `
         ${labelHtml}
