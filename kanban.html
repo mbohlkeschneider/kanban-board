@@ -405,9 +405,18 @@
     align-items: center;
     justify-content: center;
     z-index: 2000;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   #overlay.hidden { display: none; }
+
+  @media (max-height: 500px) {
+    #overlay {
+      align-items: flex-start;
+      padding: 24px 0;
+    }
+  }
 
   .pin-box {
     background: #fff;
@@ -417,6 +426,8 @@
     text-align: center;
     max-width: 320px;
     width: 90%;
+    margin: auto;
+    flex-shrink: 0;
   }
 
   .pin-box h2 {
@@ -482,6 +493,8 @@
     max-width: 400px;
     width: 90%;
     text-align: center;
+    margin: auto;
+    flex-shrink: 0;
   }
 
   .selector-box h2 {
@@ -979,7 +992,11 @@ function showOverlay(state) {
         <button class="btn-secondary" onclick="showOverlay(null)">Done</button>
       </div>`;
       setupEnterKey("new-member-input", addBoardUser);
-      document.getElementById("new-member-input").focus();
+      const memberInput = document.getElementById("new-member-input");
+      memberInput.focus();
+      memberInput.addEventListener("focus", () => {
+        setTimeout(() => memberInput.scrollIntoView({ behavior: "smooth", block: "center" }), 300);
+      });
       break;
     }
   }
