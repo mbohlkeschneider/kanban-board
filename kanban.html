@@ -268,16 +268,6 @@
     color: #b0a0b0;
   }
 
-  .assignee-tag[data-user="Nina"] {
-    background: #FFCBE1;
-    color: #5a4a5a;
-  }
-
-  .assignee-tag[data-user="Stephan"] {
-    background: #BCD8EC;
-    color: #5a4a5a;
-  }
-
   .card-actions {
     display: flex;
     gap: 6px;
@@ -594,6 +584,116 @@
     line-height: 1.4;
   }
 
+  /* Manage Members */
+  .btn-users {
+    position: absolute;
+    right: 12px;
+    background: none;
+    border: none;
+    font-size: 1.2rem;
+    cursor: pointer;
+    color: #5a4a5a;
+    padding: 4px 8px;
+    border-radius: 8px;
+    transition: background 0.15s;
+  }
+
+  .btn-users:hover { background: #f5f0f5; }
+  .btn-users.hidden { display: none; }
+
+  .member-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 16px;
+    max-height: 40vh;
+    overflow-y: auto;
+  }
+
+  .member-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: #faf3f0;
+    border: 2px solid #f0e8f0;
+    border-radius: 10px;
+    padding: 10px 12px;
+  }
+
+  .member-dot {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .member-name {
+    flex: 1;
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: #5a4a5a;
+    text-align: left;
+  }
+
+  .btn-remove-member {
+    background: #FFDAB4;
+    border: none;
+    border-radius: 8px;
+    width: 28px;
+    height: 28px;
+    font-size: 0.75rem;
+    cursor: pointer;
+    color: #5a4a5a;
+    flex-shrink: 0;
+    transition: opacity 0.15s;
+  }
+
+  .btn-remove-member:active { opacity: 0.6; }
+
+  .add-member-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+
+  .add-member-row input {
+    flex: 1;
+    padding: 10px;
+    border: 2px solid #f0e8f0;
+    border-radius: 10px;
+    font-size: 0.9rem;
+    font-family: inherit;
+    color: #4a4a4a;
+    text-align: left;
+    letter-spacing: normal;
+    -webkit-user-select: text;
+    user-select: text;
+  }
+
+  .add-member-row input:focus { outline: none; border-color: #DCCCEC; }
+
+  .add-member-row button {
+    padding: 10px 16px;
+    border: none;
+    border-radius: 10px;
+    background: #DCCCEC;
+    color: #5a4a5a;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    flex-shrink: 0;
+    transition: opacity 0.15s;
+  }
+
+  .add-member-row button:active { opacity: 0.6; }
+
+  .members-empty {
+    color: #b0a0b0;
+    font-size: 0.85rem;
+    padding: 12px 0;
+  }
+
   /* Connection status dot */
   .status-dot {
     display: inline-block;
@@ -625,6 +725,7 @@
   <button class="btn-back hidden" id="btn-back" onclick="showBoardSelector()">&#9776;</button>
   <span class="board-title" id="board-title" onclick="startBoardRename()">Kanban Board</span>
   <span class="status-dot" id="status-dot" title="Offline"></span>
+  <button class="btn-users hidden" id="btn-users" onclick="showOverlay('manage-users')" title="Manage members">&#9881;</button>
 </header>
 
 <div class="board" id="board"></div>
@@ -647,6 +748,7 @@ let columnsRef = null;
 let tasksRef = null;
 let boardNameRef = null;
 let userBoardsRef = null;
+let usersRef = null;
 let renderTimeout = null;
 
 /* ── Multi-board State ── */
@@ -853,6 +955,33 @@ function showOverlay(state) {
       setupEnterKey("migrate-pin-input", submitMigration);
       document.getElementById("migrate-pin-input").focus();
       break;
+
+    case "manage-users": {
+      let membersHtml = "";
+      if (boardUsers.length === 0) {
+        membersHtml = `<div class="members-empty">No members yet. Add people to assign cards to them.</div>`;
+      } else {
+        boardUsers.forEach((name, i) => {
+          membersHtml += `<div class="member-item">
+            <span class="member-dot" style="background:${PALETTE[i % PALETTE.length]}"></span>
+            <span class="member-name">${escapeHtml(name)}</span>
+            <button class="btn-remove-member" onclick="removeBoardUser(${i})" title="Remove">&#x2715;</button>
+          </div>`;
+        });
+      }
+      overlay.innerHTML = `<div class="pin-box" style="max-width:360px">
+        <h2>Board Members</h2>
+        <div class="member-list">${membersHtml}</div>
+        <div class="add-member-row">
+          <input type="text" id="new-member-input" placeholder="Name" autocomplete="off">
+          <button onclick="addBoardUser()">Add</button>
+        </div>
+        <button class="btn-secondary" onclick="showOverlay(null)">Done</button>
+      </div>`;
+      setupEnterKey("new-member-input", addBoardUser);
+      document.getElementById("new-member-input").focus();
+      break;
+    }
   }
 }
 
@@ -959,6 +1088,23 @@ async function leaveBoard(boardId) {
   if (currentOverlay === "board-selector") showOverlay("board-selector");
 }
 
+/* ── Board Member Management ── */
+function addBoardUser() {
+  const input = document.getElementById("new-member-input");
+  const name = input.value.trim();
+  if (!name) return;
+  if (boardUsers.includes(name)) { input.value = ""; return; }
+  saveBoardUsers([...boardUsers, name]);
+  showOverlay("manage-users");
+}
+
+function removeBoardUser(idx) {
+  const users = [...boardUsers];
+  users.splice(idx, 1);
+  saveBoardUsers(users);
+  showOverlay("manage-users");
+}
+
 /* ── Firebase Connection ── */
 function initFirebase() {
   try {
@@ -999,6 +1145,7 @@ function disconnectBoard() {
   if (columnsRef) { columnsRef.off(); columnsRef = null; }
   if (tasksRef) { tasksRef.off(); tasksRef = null; }
   if (boardNameRef) { boardNameRef.off(); boardNameRef = null; }
+  if (usersRef) { usersRef.off(); usersRef = null; }
 }
 
 function connectFirebase(boardId) {
@@ -1050,6 +1197,17 @@ function connectFirebase(boardId) {
       tasksRef.set(localTasks);
     }
   });
+
+  // Real-time sync for board members
+  usersRef = db.ref("boards/" + boardId + "/users");
+  usersRef.on("value", (snap) => {
+    const data = snap.val();
+    if (data) {
+      boardUsers = Array.isArray(data) ? data : Object.values(data);
+      localStorage.setItem("kanban_board_users", JSON.stringify(boardUsers));
+      debouncedRender();
+    }
+  });
 }
 
 /* ── Board Switching ── */
@@ -1060,6 +1218,8 @@ function switchToBoard(boardId) {
     // Switching to a different board — clear stale data
     localStorage.removeItem("kanban_columns");
     localStorage.removeItem("kanban_tasks");
+    localStorage.removeItem("kanban_board_users");
+    boardUsers = [];
   }
   localStorage.setItem("kanban_board_id", boardId);
   localStorage.setItem("kanban_last_board_id", boardId);
@@ -1067,8 +1227,10 @@ function switchToBoard(boardId) {
   if (userBoards[boardId]) {
     localStorage.setItem("kanban_board_name", userBoards[boardId].name);
   }
+  boardUsers = loadBoardUsers();
   showOverlay(null);
   document.getElementById("btn-back").classList.remove("hidden");
+  document.getElementById("btn-users").classList.remove("hidden");
   updateBoardTitleDisplay();
   render();
   connectFirebase(boardId);
@@ -1077,6 +1239,7 @@ function switchToBoard(boardId) {
 function showBoardSelector() {
   disconnectBoard();
   document.getElementById("btn-back").classList.add("hidden");
+  document.getElementById("btn-users").classList.add("hidden");
   document.getElementById("board").innerHTML = "";
   showOverlay("board-selector");
 }
@@ -1120,7 +1283,25 @@ async function initApp() {
 /* ── Drag State ── */
 let dragState = null;
 
-const USERS = ["Nina", "Stephan"];
+let boardUsers = [];
+
+function loadBoardUsers() {
+  try {
+    return JSON.parse(localStorage.getItem("kanban_board_users")) || [];
+  } catch { return []; }
+}
+
+function saveBoardUsers(users) {
+  boardUsers = users;
+  localStorage.setItem("kanban_board_users", JSON.stringify(users));
+  if (usersRef) usersRef.set(users);
+}
+
+function getUserColor(userName) {
+  const idx = boardUsers.indexOf(userName);
+  if (idx === -1) return "#f0e8f0";
+  return PALETTE[idx % PALETTE.length];
+}
 
 function escapeHtml(str) {
   const d = document.createElement("div");
@@ -1180,12 +1361,13 @@ function render() {
       btns += `<button class="btn-delete" onclick="deleteTask('${col.id}',${idx})">&#x2715;</button>`;
 
       const assigneeLabel = item.assignee || "\u2014";
-      const assigneeClass = item.assignee ? `" data-user="${item.assignee}` : ' unassigned';
+      const assigneeClass = item.assignee ? '' : ' unassigned';
+      const tagStyle = item.assignee ? `background:${getUserColor(item.assignee)};color:#5a4a5a` : '';
 
       const renderedText = window.marked ? marked.parse(item.text) : escapeHtml(item.text);
       card.innerHTML = `
         <div class="card-text">${renderedText}</div>
-        <button class="assignee-tag${assigneeClass}" onclick="cycleAssignee('${col.id}',${idx})">${escapeHtml(assigneeLabel)}</button>
+        <button class="assignee-tag${assigneeClass}" style="${tagStyle}" onclick="cycleAssignee('${col.id}',${idx})">${escapeHtml(assigneeLabel)}</button>
         <div class="card-actions">${btns}</div>
       `;
 
@@ -1265,7 +1447,7 @@ function saveEdit(colId, idx) {
 function cycleAssignee(colId, idx) {
   const tasks = loadTasks();
   const item = normalizeTask(tasks[colId][idx]);
-  const cycle = ["", ...USERS];
+  const cycle = ["", ...boardUsers];
   const next = (cycle.indexOf(item.assignee) + 1) % cycle.length;
   item.assignee = cycle[next];
   tasks[colId][idx] = item;
