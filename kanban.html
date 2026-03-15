@@ -34,7 +34,27 @@
     color: #5a4a5a;
     border-bottom: 3px solid #FFCBE1;
     letter-spacing: 0.5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
   }
+
+  .btn-back {
+    position: absolute;
+    left: 12px;
+    background: none;
+    border: none;
+    font-size: 1.4rem;
+    cursor: pointer;
+    color: #5a4a5a;
+    padding: 4px 8px;
+    border-radius: 8px;
+    transition: background 0.15s;
+  }
+
+  .btn-back:hover { background: #f5f0f5; }
+  .btn-back.hidden { display: none; }
 
   .board-title {
     cursor: pointer;
@@ -386,8 +406,8 @@
     line-height: 1.4;
   }
 
-  /* PIN overlay */
-  #pin-overlay {
+  /* Overlay */
+  #overlay {
     position: fixed;
     inset: 0;
     background: rgba(250, 243, 240, 0.95);
@@ -397,7 +417,7 @@
     z-index: 2000;
   }
 
-  #pin-overlay.hidden { display: none; }
+  #overlay.hidden { display: none; }
 
   .pin-box {
     background: #fff;
@@ -435,6 +455,11 @@
     user-select: text;
   }
 
+  .pin-box input[type="text"] {
+    letter-spacing: normal;
+    margin-top: 10px;
+  }
+
   .pin-box input:focus { outline: none; border-color: #DCCCEC; }
 
   .pin-box button {
@@ -453,6 +478,121 @@
   }
 
   .pin-box button:active { opacity: 0.6; }
+
+  .pin-box .btn-secondary {
+    background: #f0e8f0;
+  }
+
+  /* Board Selector */
+  .selector-box {
+    background: #fff;
+    border-radius: 16px;
+    padding: 32px 28px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.1);
+    max-width: 400px;
+    width: 90%;
+    text-align: center;
+  }
+
+  .selector-box h2 {
+    color: #5a4a5a;
+    font-size: 1.2rem;
+    margin-bottom: 20px;
+  }
+
+  .board-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 20px;
+    max-height: 60vh;
+    overflow-y: auto;
+  }
+
+  .board-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #faf3f0;
+    border: 2px solid #f0e8f0;
+    border-radius: 12px;
+    padding: 14px 16px;
+    transition: border-color 0.15s;
+  }
+
+  .board-card:hover { border-color: #DCCCEC; }
+
+  .board-card-name {
+    font-weight: 600;
+    color: #5a4a5a;
+    font-size: 0.95rem;
+    text-align: left;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .board-card-actions {
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+    margin-left: 12px;
+  }
+
+  .board-card-actions button {
+    border: none;
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    color: #5a4a5a;
+    transition: opacity 0.15s;
+    font-family: inherit;
+  }
+
+  .board-card-actions button:active { opacity: 0.6; }
+
+  .btn-open { background: #D6E5BD; }
+  .btn-leave-board { background: #FFDAB4; }
+
+  .btn-add-board {
+    width: 100%;
+    padding: 14px;
+    border: 3px dashed #e0d8e0;
+    border-radius: 12px;
+    background: transparent;
+    color: #b0a0b0;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    transition: border-color 0.15s, color 0.15s, background 0.15s;
+  }
+
+  .btn-add-board:hover {
+    border-color: #DCCCEC;
+    color: #5a4a5a;
+    background: rgba(220, 204, 236, 0.1);
+  }
+
+  .board-empty {
+    color: #b0a0b0;
+    font-size: 0.9rem;
+    padding: 20px 0;
+  }
+
+  .migrate-info {
+    background: #faf3f0;
+    border-radius: 10px;
+    padding: 12px;
+    margin-bottom: 16px;
+    font-size: 0.85rem;
+    color: #5a4a5a;
+    line-height: 1.4;
+  }
 
   /* Connection status dot */
   .status-dot {
@@ -479,22 +619,18 @@
 </head>
 <body>
 
-<div id="pin-overlay">
-  <div class="pin-box">
-    <h2>Enter Board PIN</h2>
-    <p>Share the same PIN to sync between devices</p>
-    <input type="password" id="pin-input" placeholder="PIN" autocomplete="off">
-    <button id="pin-submit">Connect</button>
-  </div>
-</div>
+<div id="overlay" class="hidden"></div>
 
-<header><span class="board-title" id="board-title" onclick="startBoardRename()">Kanban Board</span><span class="status-dot" id="status-dot" title="Offline"></span></header>
+<header>
+  <button class="btn-back hidden" id="btn-back" onclick="showBoardSelector()">&#9776;</button>
+  <span class="board-title" id="board-title" onclick="startBoardRename()">Kanban Board</span>
+  <span class="status-dot" id="status-dot" title="Offline"></span>
+</header>
 
 <div class="board" id="board"></div>
 
 <script>
 /* ── Firebase Config ── */
-// TODO: Replace with your Firebase project config from console.firebase.google.com
 const firebaseConfig = {
   apiKey: "AIzaSyBcWzRjHDj3z-31TAWGoeifwaapPA9hxuc",
   authDomain: "kanban-board-50317.firebaseapp.com",
@@ -510,7 +646,13 @@ let db = null;
 let columnsRef = null;
 let tasksRef = null;
 let boardNameRef = null;
+let userBoardsRef = null;
 let renderTimeout = null;
+
+/* ── Multi-board State ── */
+let userId = null;
+let userBoards = {};
+let currentOverlay = null;
 
 const PALETTE = ["#FFCBE1", "#F9E1A8", "#D6E5BD", "#BCD8EC", "#DCCCEC", "#FFDAB4"];
 
@@ -521,11 +663,9 @@ const DEFAULT_COLUMNS = [
 ];
 
 /* ── Firebase data normalization ── */
-// Firebase drops empty arrays and converts arrays to objects with numeric keys
 function normalizeFirebaseColumns(data) {
   if (!data) return null;
   if (Array.isArray(data)) return data;
-  // Object with numeric keys → array
   if (typeof data === "object") {
     const keys = Object.keys(data);
     if (keys.every(k => !isNaN(k))) return keys.sort((a,b) => a - b).map(k => data[k]);
@@ -584,6 +724,13 @@ function loadBoardName() {
 function saveBoardName(name) {
   localStorage.setItem("kanban_board_name", name);
   if (boardNameRef) boardNameRef.set(name);
+  // Sync to user's board list
+  const boardId = localStorage.getItem("kanban_board_id");
+  if (userBoardsRef && boardId && userBoards[boardId]) {
+    userBoardsRef.child(boardId).child("name").set(name);
+    userBoards[boardId].name = name;
+    localStorage.setItem("kanban_user_boards", JSON.stringify(userBoards));
+  }
 }
 
 function updateBoardTitleDisplay() {
@@ -624,24 +771,200 @@ function startBoardRename() {
   });
 }
 
-/* ── SHA-256 hashing for PIN → boardId ── */
+/* ── SHA-256 hashing for PIN → ID ── */
 async function hashPin(pin) {
   const data = new TextEncoder().encode(pin);
   const hash = await crypto.subtle.digest("SHA-256", data);
   return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, "0")).join("");
 }
 
+/* ── Overlay System ── */
+function showOverlay(state) {
+  currentOverlay = state;
+  const overlay = document.getElementById("overlay");
+
+  if (!state) {
+    overlay.classList.add("hidden");
+    overlay.innerHTML = "";
+    return;
+  }
+
+  overlay.classList.remove("hidden");
+
+  switch (state) {
+    case "user-pin":
+      overlay.innerHTML = `<div class="pin-box">
+        <h2>Your User PIN</h2>
+        <p>Use the same PIN on all devices to sync your board list</p>
+        <input type="password" id="user-pin-input" placeholder="PIN" autocomplete="off">
+        <button onclick="submitUserPin()">Continue</button>
+      </div>`;
+      setupEnterKey("user-pin-input", submitUserPin);
+      document.getElementById("user-pin-input").focus();
+      break;
+
+    case "board-selector": {
+      const boardIds = Object.keys(userBoards);
+      let cardsHtml = "";
+      if (boardIds.length === 0) {
+        cardsHtml = `<div class="board-empty">No boards yet. Add one to get started!</div>`;
+      } else {
+        boardIds.forEach(bid => {
+          const b = userBoards[bid];
+          cardsHtml += `<div class="board-card">
+            <span class="board-card-name">${escapeHtml(b.name || "Unnamed Board")}</span>
+            <div class="board-card-actions">
+              <button class="btn-open" onclick="switchToBoard('${bid}')">Open</button>
+              <button class="btn-leave-board" onclick="leaveBoard('${bid}')" title="Leave board">&#x2715;</button>
+            </div>
+          </div>`;
+        });
+      }
+      overlay.innerHTML = `<div class="selector-box">
+        <h2>Your Boards</h2>
+        <div class="board-list">${cardsHtml}</div>
+        <button class="btn-add-board" onclick="showOverlay('add-board')">+ Add Board</button>
+      </div>`;
+      break;
+    }
+
+    case "add-board":
+      overlay.innerHTML = `<div class="pin-box">
+        <h2>Add Board</h2>
+        <p>Enter a Board PIN to create or join a board</p>
+        <input type="password" id="board-pin-input" placeholder="Board PIN" autocomplete="off">
+        <input type="text" id="board-name-input" placeholder="Board name (optional)">
+        <button onclick="submitAddBoard()">Add Board</button>
+        <button class="btn-secondary" onclick="showOverlay('board-selector')">Cancel</button>
+      </div>`;
+      setupEnterKey("board-pin-input", submitAddBoard);
+      setupEnterKey("board-name-input", submitAddBoard);
+      document.getElementById("board-pin-input").focus();
+      break;
+
+    case "migrate":
+      overlay.innerHTML = `<div class="pin-box">
+        <h2>Set Your User PIN</h2>
+        <p>Enable multi-board support</p>
+        <div class="migrate-info">Your current board will be added to your board list automatically. Use the same User PIN on all your devices to sync your board list.</div>
+        <input type="password" id="migrate-pin-input" placeholder="Your User PIN" autocomplete="off">
+        <button onclick="submitMigration()">Continue</button>
+      </div>`;
+      setupEnterKey("migrate-pin-input", submitMigration);
+      document.getElementById("migrate-pin-input").focus();
+      break;
+  }
+}
+
+function setupEnterKey(inputId, fn) {
+  document.getElementById(inputId).addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); fn(); }
+  });
+}
+
+/* ── User PIN Submission ── */
+async function submitUserPin() {
+  const input = document.getElementById("user-pin-input");
+  const pin = input.value.trim();
+  if (!pin) return;
+
+  userId = await hashPin(pin);
+  localStorage.setItem("kanban_user_pin", pin);
+  localStorage.setItem("kanban_user_id", userId);
+
+  connectUserFirebase(userId);
+  showOverlay("board-selector");
+}
+
+/* ── Add Board Submission ── */
+async function submitAddBoard() {
+  const pinInput = document.getElementById("board-pin-input");
+  const nameInput = document.getElementById("board-name-input");
+  const pin = pinInput.value.trim();
+  if (!pin) return;
+
+  const boardId = await hashPin(pin);
+  const customName = nameInput.value.trim();
+
+  if (db) {
+    const snap = await db.ref("boards/" + boardId + "/name").once("value");
+    const existingName = snap.val();
+
+    if (existingName) {
+      // Board exists — join it
+      await addBoardToUserList(boardId, existingName);
+    } else {
+      // New board — create it
+      const name = customName || "Kanban Board";
+      await db.ref("boards/" + boardId + "/name").set(name);
+      await db.ref("boards/" + boardId + "/columns").set(DEFAULT_COLUMNS);
+      await db.ref("boards/" + boardId + "/tasks").set({});
+      await addBoardToUserList(boardId, name);
+    }
+  } else {
+    // Offline — create locally
+    const name = customName || "Kanban Board";
+    await addBoardToUserList(boardId, name);
+  }
+
+  switchToBoard(boardId);
+}
+
+/* ── Migration from legacy single-board ── */
+async function submitMigration() {
+  const input = document.getElementById("migrate-pin-input");
+  const pin = input.value.trim();
+  if (!pin) return;
+
+  userId = await hashPin(pin);
+  localStorage.setItem("kanban_user_pin", pin);
+  localStorage.setItem("kanban_user_id", userId);
+
+  const existingBoardId = localStorage.getItem("kanban_board_id");
+  const existingName = loadBoardName();
+
+  connectUserFirebase(userId);
+
+  if (existingBoardId) {
+    await addBoardToUserList(existingBoardId, existingName);
+    localStorage.removeItem("kanban_pin");
+    switchToBoard(existingBoardId);
+  } else {
+    showOverlay("board-selector");
+  }
+}
+
+/* ── Board List Management ── */
+async function addBoardToUserList(boardId, name) {
+  const entry = { name: name, joinedAt: Date.now() };
+  userBoards[boardId] = entry;
+  localStorage.setItem("kanban_user_boards", JSON.stringify(userBoards));
+  if (userBoardsRef) {
+    await userBoardsRef.child(boardId).set(entry);
+  }
+}
+
+async function leaveBoard(boardId) {
+  delete userBoards[boardId];
+  localStorage.setItem("kanban_user_boards", JSON.stringify(userBoards));
+  if (userBoardsRef) {
+    await userBoardsRef.child(boardId).remove();
+  }
+  // If this was the active board, clear it
+  if (localStorage.getItem("kanban_board_id") === boardId) {
+    disconnectBoard();
+    localStorage.removeItem("kanban_board_id");
+    localStorage.removeItem("kanban_last_board_id");
+  }
+  if (currentOverlay === "board-selector") showOverlay("board-selector");
+}
+
 /* ── Firebase Connection ── */
-function connectFirebase(boardId) {
+function initFirebase() {
   try {
     if (!window.firebase || !window.firebase.database) return;
-
     db = firebase.database();
-    columnsRef = db.ref("boards/" + boardId + "/columns");
-    tasksRef = db.ref("boards/" + boardId + "/tasks");
-    boardNameRef = db.ref("boards/" + boardId + "/name");
 
-    // Connection status indicator
     const dot = document.getElementById("status-dot");
     db.ref(".info/connected").on("value", (snap) => {
       if (snap.val() === true) {
@@ -652,49 +975,110 @@ function connectFirebase(boardId) {
         dot.title = "Offline";
       }
     });
-
-    // Real-time sync for board name
-    boardNameRef.on("value", (snap) => {
-      const name = snap.val();
-      if (name) {
-        localStorage.setItem("kanban_board_name", name);
-        updateBoardTitleDisplay();
-      } else {
-        // First connection — push local name
-        boardNameRef.set(loadBoardName());
-      }
-    });
-
-    // Real-time sync for columns
-    columnsRef.on("value", (snap) => {
-      const data = snap.val();
-      const cols = normalizeFirebaseColumns(data);
-      if (cols && cols.length) {
-        localStorage.setItem("kanban_columns", JSON.stringify(cols));
-        debouncedRender();
-      } else if (!data) {
-        // First connection with no remote data → push defaults
-        const localCols = loadColumns();
-        columnsRef.set(localCols);
-      }
-    });
-
-    // Real-time sync for tasks
-    tasksRef.on("value", (snap) => {
-      const data = snap.val();
-      if (data !== null) {
-        const tasks = normalizeFirebaseTasks(data);
-        localStorage.setItem("kanban_tasks", JSON.stringify(tasks));
-        debouncedRender();
-      } else {
-        // First connection with no remote data → push defaults
-        const localTasks = loadTasks();
-        tasksRef.set(localTasks);
-      }
-    });
   } catch (e) {
-    console.warn("Firebase connection failed, using localStorage only:", e);
+    console.warn("Firebase connection failed:", e);
   }
+}
+
+function connectUserFirebase(uid) {
+  if (!db) return;
+  if (userBoardsRef) userBoardsRef.off();
+  userBoardsRef = db.ref("users/" + uid + "/boards");
+  userBoardsRef.on("value", (snap) => {
+    const data = snap.val();
+    if (data) {
+      userBoards = data;
+      localStorage.setItem("kanban_user_boards", JSON.stringify(userBoards));
+    }
+    // Re-render board selector if visible
+    if (currentOverlay === "board-selector") showOverlay("board-selector");
+  });
+}
+
+function disconnectBoard() {
+  if (columnsRef) { columnsRef.off(); columnsRef = null; }
+  if (tasksRef) { tasksRef.off(); tasksRef = null; }
+  if (boardNameRef) { boardNameRef.off(); boardNameRef = null; }
+}
+
+function connectFirebase(boardId) {
+  if (!db) return;
+
+  columnsRef = db.ref("boards/" + boardId + "/columns");
+  tasksRef = db.ref("boards/" + boardId + "/tasks");
+  boardNameRef = db.ref("boards/" + boardId + "/name");
+
+  // Real-time sync for board name
+  boardNameRef.on("value", (snap) => {
+    const name = snap.val();
+    if (name) {
+      localStorage.setItem("kanban_board_name", name);
+      updateBoardTitleDisplay();
+      // Keep user's board list name in sync
+      if (userBoards[boardId] && userBoards[boardId].name !== name) {
+        userBoards[boardId].name = name;
+        localStorage.setItem("kanban_user_boards", JSON.stringify(userBoards));
+        if (userBoardsRef) userBoardsRef.child(boardId).child("name").set(name);
+      }
+    } else {
+      boardNameRef.set(loadBoardName());
+    }
+  });
+
+  // Real-time sync for columns
+  columnsRef.on("value", (snap) => {
+    const data = snap.val();
+    const cols = normalizeFirebaseColumns(data);
+    if (cols && cols.length) {
+      localStorage.setItem("kanban_columns", JSON.stringify(cols));
+      debouncedRender();
+    } else if (!data) {
+      const localCols = loadColumns();
+      columnsRef.set(localCols);
+    }
+  });
+
+  // Real-time sync for tasks
+  tasksRef.on("value", (snap) => {
+    const data = snap.val();
+    if (data !== null) {
+      const tasks = normalizeFirebaseTasks(data);
+      localStorage.setItem("kanban_tasks", JSON.stringify(tasks));
+      debouncedRender();
+    } else {
+      const localTasks = loadTasks();
+      tasksRef.set(localTasks);
+    }
+  });
+}
+
+/* ── Board Switching ── */
+function switchToBoard(boardId) {
+  disconnectBoard();
+  const currentBoardId = localStorage.getItem("kanban_board_id");
+  if (currentBoardId !== boardId) {
+    // Switching to a different board — clear stale data
+    localStorage.removeItem("kanban_columns");
+    localStorage.removeItem("kanban_tasks");
+  }
+  localStorage.setItem("kanban_board_id", boardId);
+  localStorage.setItem("kanban_last_board_id", boardId);
+  // Set board name from userBoards cache
+  if (userBoards[boardId]) {
+    localStorage.setItem("kanban_board_name", userBoards[boardId].name);
+  }
+  showOverlay(null);
+  document.getElementById("btn-back").classList.remove("hidden");
+  updateBoardTitleDisplay();
+  render();
+  connectFirebase(boardId);
+}
+
+function showBoardSelector() {
+  disconnectBoard();
+  document.getElementById("btn-back").classList.add("hidden");
+  document.getElementById("board").innerHTML = "";
+  showOverlay("board-selector");
 }
 
 function debouncedRender() {
@@ -702,43 +1086,39 @@ function debouncedRender() {
   renderTimeout = setTimeout(render, 50);
 }
 
-/* ── PIN / Init Flow ── */
+/* ── Init ── */
 async function initApp() {
+  const storedUserId = localStorage.getItem("kanban_user_id");
   const storedBoardId = localStorage.getItem("kanban_board_id");
+  const lastBoardId = localStorage.getItem("kanban_last_board_id");
 
-  if (storedBoardId) {
-    // Have a boardId — render immediately from localStorage, then connect
-    document.getElementById("pin-overlay").classList.add("hidden");
-    updateBoardTitleDisplay();
-    render();
-    connectFirebase(storedBoardId);
+  try {
+    userBoards = JSON.parse(localStorage.getItem("kanban_user_boards")) || {};
+  } catch { userBoards = {}; }
+
+  if (!storedUserId) {
+    if (storedBoardId) {
+      // Legacy user — needs migration
+      showOverlay("migrate");
+    } else {
+      showOverlay("user-pin");
+    }
+    return;
+  }
+
+  userId = storedUserId;
+  connectUserFirebase(userId);
+
+  const targetBoard = lastBoardId || storedBoardId;
+  if (targetBoard && userBoards[targetBoard]) {
+    switchToBoard(targetBoard);
   } else {
-    // Show PIN overlay
-    document.getElementById("pin-overlay").classList.remove("hidden");
+    showOverlay("board-selector");
   }
 }
 
-document.getElementById("pin-submit").addEventListener("click", async () => {
-  const pin = document.getElementById("pin-input").value.trim();
-  if (!pin) return;
-
-  const boardId = await hashPin(pin);
-  localStorage.setItem("kanban_pin", pin);
-  localStorage.setItem("kanban_board_id", boardId);
-  document.getElementById("pin-overlay").classList.add("hidden");
-  render();
-  connectFirebase(boardId);
-});
-
-document.getElementById("pin-input").addEventListener("keydown", (e) => {
-  if (e.key === "Enter") {
-    e.preventDefault();
-    document.getElementById("pin-submit").click();
-  }
-});
-
 /* ── Drag State ── */
-let dragState = null; // { colId, idx, ghost, currentDropCol, currentDropIdx, scrollInterval }
+let dragState = null;
 
 const USERS = ["Nina", "Stephan"];
 
@@ -748,7 +1128,6 @@ function escapeHtml(str) {
   return d.innerHTML;
 }
 
-/* Normalize a task entry: old format (string) → { text, assignee } */
 function normalizeTask(item) {
   if (typeof item === "string") return { text: item, assignee: "" };
   return item;
@@ -800,7 +1179,7 @@ function render() {
       btns += `<button class="btn-edit" onclick="editTask('${col.id}',${idx})">&#9998;</button>`;
       btns += `<button class="btn-delete" onclick="deleteTask('${col.id}',${idx})">&#x2715;</button>`;
 
-      const assigneeLabel = item.assignee || "—";
+      const assigneeLabel = item.assignee || "\u2014";
       const assigneeClass = item.assignee ? `" data-user="${item.assignee}` : ' unassigned';
 
       const renderedText = window.marked ? marked.parse(item.text) : escapeHtml(item.text);
@@ -810,10 +1189,7 @@ function render() {
         <div class="card-actions">${btns}</div>
       `;
 
-      // Touch drag
       card.addEventListener("touchstart", onTouchStart, { passive: false });
-
-      // Mouse drag
       card.addEventListener("mousedown", onMouseDown);
 
       cardsEl.appendChild(card);
@@ -889,7 +1265,7 @@ function saveEdit(colId, idx) {
 function cycleAssignee(colId, idx) {
   const tasks = loadTasks();
   const item = normalizeTask(tasks[colId][idx]);
-  const cycle = ["", ...USERS]; // "" → Nina → Stephan → ""
+  const cycle = ["", ...USERS];
   const next = (cycle.indexOf(item.assignee) + 1) % cycle.length;
   item.assignee = cycle[next];
   tasks[colId][idx] = item;
@@ -920,7 +1296,6 @@ function addColumn() {
   tasks[newCol.id] = [];
   saveTasks(tasks);
   render();
-  // Auto-start rename on the new column
   startRename(newCol.id);
 }
 
@@ -1003,11 +1378,10 @@ function getDropTarget(x, y) {
 
   for (const cardsEl of cardEls) {
     const rect = cardsEl.getBoundingClientRect();
-    // Check if x is roughly within this column
     if (x >= rect.left - 20 && x <= rect.right + 20) {
       bestCol = cardsEl.dataset.col;
       const children = cardsEl.querySelectorAll(".card");
-      bestIdx = children.length; // default: append at end
+      bestIdx = children.length;
 
       for (let i = 0; i < children.length; i++) {
         const cardRect = children[i].getBoundingClientRect();
@@ -1050,8 +1424,8 @@ function showDropIndicator(col, idx) {
 }
 
 /* ── Auto-scroll during drag ── */
-const SCROLL_EDGE = 50; // px from screen edge to trigger scroll
-const SCROLL_SPEED = 8; // px per frame
+const SCROLL_EDGE = 50;
+const SCROLL_SPEED = 8;
 
 function updateAutoScroll(x) {
   const board = document.getElementById("board");
@@ -1076,18 +1450,15 @@ function finishDrag() {
   const dropCol = dragState.currentDropCol;
   let dropIdx = dragState.currentDropIdx;
 
-  // Clean up
   if (dragState.scrollInterval) clearInterval(dragState.scrollInterval);
   if (ghost) ghost.remove();
   clearDropIndicators();
   document.querySelectorAll(".card.dragging").forEach(el => el.classList.remove("dragging"));
 
-  // Perform the move if we have a valid target
   if (dropCol) {
     const tasks = loadTasks();
     const [item] = tasks[colId].splice(idx, 1);
 
-    // Adjust index if moving within the same column downward
     if (colId === dropCol && dropIdx > idx) {
       dropIdx--;
     }
@@ -1102,7 +1473,7 @@ function finishDrag() {
 
 /* ── Touch Drag (long-press to initiate) ── */
 const LONG_PRESS_MS = 300;
-const LONG_PRESS_MOVE_THRESHOLD = 10; // px – cancel if finger moves before timer
+const LONG_PRESS_MOVE_THRESHOLD = 10;
 let longPressTimer = null;
 let longPressCard = null;
 let longPressStartX = 0;
@@ -1115,7 +1486,6 @@ function cancelLongPress() {
 }
 
 function onTouchStart(e) {
-  // Don't drag if tapping a button or editing
   if (e.target.closest("button")) return;
   if (e.target.closest(".editing")) return;
   if (e.target.tagName === "TEXTAREA") return;
@@ -1129,10 +1499,8 @@ function onTouchStart(e) {
   longPressCard = card;
   touchDragActive = false;
 
-  // Start long-press timer
   longPressTimer = setTimeout(() => {
     longPressTimer = null;
-    // Activate drag
     const colId = card.dataset.col;
     const idx = parseInt(card.dataset.idx);
     const tasks = loadTasks();
@@ -1145,11 +1513,9 @@ function onTouchStart(e) {
     dragState = { colId, idx, ghost, currentDropCol: null, currentDropIdx: 0 };
     touchDragActive = true;
 
-    // Vibrate for haptic feedback if available
     if (navigator.vibrate) navigator.vibrate(30);
   }, LONG_PRESS_MS);
 
-  // Show visual feedback after a short delay
   setTimeout(() => { if (longPressTimer && longPressCard === card) card.classList.add("long-press"); }, 100);
 
   document.addEventListener("touchmove", onTouchMove, { passive: false });
@@ -1159,16 +1525,14 @@ function onTouchStart(e) {
 function onTouchMove(e) {
   const touch = e.touches[0];
 
-  // If long-press hasn't fired yet, check if finger moved too far (= scrolling)
   if (longPressTimer) {
     const dx = touch.clientX - longPressStartX;
     const dy = touch.clientY - longPressStartY;
     if (Math.abs(dx) > LONG_PRESS_MOVE_THRESHOLD || Math.abs(dy) > LONG_PRESS_MOVE_THRESHOLD) {
       cancelLongPress();
-      // Let the browser handle native scrolling
       return;
     }
-    e.preventDefault(); // Hold still = don't scroll yet
+    e.preventDefault();
     return;
   }
 
@@ -1249,7 +1613,7 @@ if (window.marked) {
   marked.setOptions({ breaks: true });
 }
 
-// Initialize Firebase SDK if available, then start app
+// Initialize Firebase SDK
 try {
   if (window.firebase && firebaseConfig.apiKey !== "YOUR_API_KEY") {
     firebase.initializeApp(firebaseConfig);
@@ -1258,6 +1622,7 @@ try {
   console.warn("Firebase init skipped:", e);
 }
 
+initFirebase();
 initApp();
 
 if ("serviceWorker" in navigator) {
