@@ -562,8 +562,29 @@
   .btn-open { background: #D6E5BD; }
   .btn-leave-board { background: #FFDAB4; }
 
+  .board-selector-actions {
+    display: flex;
+    gap: 10px;
+  }
+
+  .btn-join-board {
+    flex: 1;
+    padding: 14px;
+    border: none;
+    border-radius: 12px;
+    background: #D6E5BD;
+    color: #5a4a5a;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    transition: opacity 0.15s;
+  }
+
+  .btn-join-board:hover { opacity: 0.85; }
+
   .btn-add-board {
-    width: 100%;
+    flex: 1;
     padding: 14px;
     border: 3px dashed #e0d8e0;
     border-radius: 12px;
@@ -580,6 +601,12 @@
     border-color: #DCCCEC;
     color: #5a4a5a;
     background: rgba(220, 204, 236, 0.1);
+  }
+
+  .pin-error {
+    color: #d44;
+    font-size: 0.85rem;
+    min-height: 1.2em;
   }
 
   .board-empty {
@@ -998,18 +1025,34 @@ function showOverlay(state) {
       overlay.innerHTML = `<div class="selector-box">
         <h2>Your Boards</h2>
         <div class="board-list">${cardsHtml}</div>
-        <button class="btn-add-board" onclick="showOverlay('add-board')">+ Add Board</button>
+        <div class="board-selector-actions">
+          <button class="btn-join-board" onclick="showOverlay('join-board')">Join Board</button>
+          <button class="btn-add-board" onclick="showOverlay('add-board')">+ Create Board</button>
+        </div>
       </div>`;
       break;
     }
 
+    case "join-board":
+      overlay.innerHTML = `<div class="pin-box">
+        <h2>Join Board</h2>
+        <p>Enter the Board PIN shared with you</p>
+        <input type="password" id="join-pin-input" placeholder="Board PIN" autocomplete="off">
+        <div id="join-error" class="pin-error"></div>
+        <button onclick="submitJoinBoard()">Join</button>
+        <button class="btn-secondary" onclick="showOverlay('board-selector')">Cancel</button>
+      </div>`;
+      setupEnterKey("join-pin-input", submitJoinBoard);
+      document.getElementById("join-pin-input").focus();
+      break;
+
     case "add-board":
       overlay.innerHTML = `<div class="pin-box">
-        <h2>Add Board</h2>
-        <p>Enter a Board PIN to create or join a board</p>
+        <h2>Create Board</h2>
+        <p>Choose a PIN and name for your new board</p>
         <input type="password" id="board-pin-input" placeholder="Board PIN" autocomplete="off">
-        <input type="text" id="board-name-input" placeholder="Board name (optional)">
-        <button onclick="submitAddBoard()">Add Board</button>
+        <input type="text" id="board-name-input" placeholder="Board name">
+        <button onclick="submitAddBoard()">Create</button>
         <button class="btn-secondary" onclick="showOverlay('board-selector')">Cancel</button>
       </div>`;
       setupEnterKey("board-pin-input", submitAddBoard);
@@ -1113,7 +1156,33 @@ async function submitUserPin() {
   showOverlay("board-selector");
 }
 
-/* ── Add Board Submission ── */
+/* ── Join Board Submission ── */
+async function submitJoinBoard() {
+  const pinInput = document.getElementById("join-pin-input");
+  const errorDiv = document.getElementById("join-error");
+  const pin = pinInput.value.trim();
+  if (!pin) return;
+
+  errorDiv.textContent = "";
+  const boardId = await hashPin(pin);
+
+  if (db) {
+    const snap = await db.ref("boards/" + boardId + "/name").once("value");
+    const existingName = snap.val();
+
+    if (existingName) {
+      await addBoardToUserList(boardId, existingName);
+      switchToBoard(boardId);
+    } else {
+      errorDiv.textContent = "No board found with that PIN.";
+      pinInput.focus();
+    }
+  } else {
+    errorDiv.textContent = "Cannot verify board while offline.";
+  }
+}
+
+/* ── Create Board Submission ── */
 async function submitAddBoard() {
   const pinInput = document.getElementById("board-pin-input");
   const nameInput = document.getElementById("board-name-input");
@@ -1121,26 +1190,20 @@ async function submitAddBoard() {
   if (!pin) return;
 
   const boardId = await hashPin(pin);
-  const customName = nameInput.value.trim();
+  const name = nameInput.value.trim() || "Kanban Board";
 
   if (db) {
     const snap = await db.ref("boards/" + boardId + "/name").once("value");
-    const existingName = snap.val();
-
-    if (existingName) {
-      // Board exists — join it
-      await addBoardToUserList(boardId, existingName);
+    if (snap.val()) {
+      // Board already exists — join it instead
+      await addBoardToUserList(boardId, snap.val());
     } else {
-      // New board — create it
-      const name = customName || "Kanban Board";
       await db.ref("boards/" + boardId + "/name").set(name);
       await db.ref("boards/" + boardId + "/columns").set(DEFAULT_COLUMNS);
       await db.ref("boards/" + boardId + "/tasks").set({});
       await addBoardToUserList(boardId, name);
     }
   } else {
-    // Offline — create locally
-    const name = customName || "Kanban Board";
     await addBoardToUserList(boardId, name);
   }
 
