@@ -1541,6 +1541,13 @@ function render() {
   const columns = loadColumns();
   const tasks = loadTasks();
   const board = document.getElementById("board");
+
+  // Save scroll positions of each column's cards container
+  const scrollPositions = {};
+  board.querySelectorAll(".cards").forEach(el => {
+    if (el.dataset.col) scrollPositions[el.dataset.col] = el.scrollTop;
+  });
+
   board.innerHTML = "";
 
   columns.forEach((col, colIdx) => {
@@ -1604,6 +1611,13 @@ function render() {
 
       cardsEl.appendChild(card);
     });
+  });
+
+  // Restore scroll positions
+  board.querySelectorAll(".cards").forEach(el => {
+    if (el.dataset.col && scrollPositions[el.dataset.col] != null) {
+      el.scrollTop = scrollPositions[el.dataset.col];
+    }
   });
 
   // Add column button
